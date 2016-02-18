@@ -1,0 +1,63 @@
+
+function ansi_color ()
+{
+    printf $'\e['
+    local FIRST=true
+    local COLOR
+    for COLOR in "$@"; do
+        $FIRST && FIRST=false || printf ';'
+        
+        case $COLOR in 
+            null | reset | plain   ) printf  0 ;;
+            bd |bold|bright        ) printf  1 ;;
+            ft |faint|dim          ) printf  2 ;; # not widely supported
+            it |italic             ) printf  3 ;; # not widely supported
+            ul |underline          ) printf  4 ;;
+            bk |blink              ) printf  5 ;;
+            fb |fast_blink         ) printf  6 ;; # not on mac
+            rv |reverse|invert     ) printf  7 ;;
+            iv |invisible|conceal  ) printf  8 ;; # not widely supported
+            
+            double_underline       ) printf 21 ;; # not widely supported
+            no_bold | no_faint     ) printf 22 ;;
+            no_underline           ) printf 24 ;;
+            no_blink               ) printf 25 ;;
+            no_invert              ) printf 27 ;;
+            no_conceal             ) printf 28 ;;
+            
+            black                  ) printf 30 ;;
+            red                    ) printf 31 ;;
+            green                  ) printf 32 ;;
+            yellow                 ) printf 33 ;;
+            blue                   ) printf 34 ;;
+            magenta                ) printf 35 ;;
+            cyan                   ) printf 36 ;;
+            white                  ) printf 37 ;;
+            fg_reset               ) printf 39 ;;
+            
+            on_black               ) printf 40 ;;
+            on_red                 ) printf 41 ;;
+            on_green               ) printf 42 ;;
+            on_yellow              ) printf 43 ;;
+            on_blue                ) printf 44 ;;
+            on_magenta             ) printf 45 ;;
+            on_cyan                ) printf 46 ;;
+            on_white               ) printf 47 ;;
+            bg_reset               ) printf 49 ;;
+            
+            on_gray                ) printf 100 ;;
+            on_bright_red          ) printf 101 ;;
+            on_bright_green        ) printf 102 ;;
+            on_bright_yellow       ) printf 103 ;;
+            on_bright_blue         ) printf 104 ;;
+            on_bright_magenta      ) printf 105 ;;
+            on_bright_cyan         ) printf 106 ;;
+            on_bright_white        ) printf 107 ;;
+            
+            * ) printf $COLOR ;;
+        esac
+    done
+    printf 'm'
+}
+
+ansi_color "$@"
