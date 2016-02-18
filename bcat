@@ -1,0 +1,8 @@
+#!/bin/sh
+INPUT="/dev/stdin"
+if [ -n "$*" ]; then
+    INPUT="$@"
+fi
+FILE="/tmp/bcat.$RANDOM.html"
+(sleep 1; open $FILE) &
+cat $INPUT > $FILE

@@ -1,0 +1,2 @@
+#!/bin/sh
+MANWIDTH=100 MANPAGER='col -bx' man "$@" | subl
