@@ -1,5 +1,8 @@
 #!/bin/sh
-exec env GIT_DIR="$HOME/.dotfiles.git" GIT_WORK_TREE="$HOME" git $@
+
+export GIT_DIR="$HOME/.dotfiles.git"
+export GIT_WORK_TREE="$HOME"
+exec git $@
 
 
 # Portable dotfiles system based on this technique:
