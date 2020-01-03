@@ -1,10 +1,11 @@
+#!/bin/sh
 
 function ansi_color ()
 {
     printf $'\e['
     local FIRST=true
     local COLOR
-    for COLOR in "$@"; do
+    for COLOR; do
         $FIRST && FIRST=false || printf ';'
         
         case $COLOR in 
@@ -60,4 +61,7 @@ function ansi_color ()
     printf 'm'
 }
 
-ansi_color "$@"
+if [[ $_ == $0 ]]; then
+    # when executing as a script (not sourced), run immediately
+    ansi_color "$@"
+fi
