@@ -10,4 +10,4 @@ git clone --bare git@github.com:USERNAME/dotfiles.git ~/.dotfiles.git
 GIT_DIR=~/.dotfiles.git GIT_WORK_TREE=~ git checkout
 
 # and make sure ~/bin is in your PATH, then you can run:
-dit status
+dit config --local status.showUntrackedFiles no
