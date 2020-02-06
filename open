@@ -1,0 +1,22 @@
+#!/bin/sh
+
+# support sourcing this script without executing it
+if [[ $_ == $0 ]]; then
+	execute=1
+fi
+
+# Normalize `open` across Linux, macOS, and Windows.
+if [ $(uname -s) = 'Darwin' ]; then
+	alias open='/usr/bin/open'
+else
+	if grep -q Microsoft /proc/version; then
+		# Ubuntu on Windows using the Linux subsystem
+		alias open='explorer.exe';
+	else
+		alias open='xdg-open';
+	fi
+fi
+
+if [ "$execute" = 1 ]; then
+    open "$@"
+fi
