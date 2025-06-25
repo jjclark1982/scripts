@@ -1,0 +1,59 @@
+#!/bin/sh -e -u
+
+DIR="$1"
+shift
+
+echo DIR=$DIR
+
+if [ ! -d "$DIR" ]; then
+	echo Error: "$DIR" is not a directory.
+	exit 1
+fi
+
+ZIPFILE="${DIR%/}.cbz"
+#ZIPFILE="${DIR}/$(basename "$DIR").cbz"
+echo ZIPFILE=$ZIPFILE
+
+if [ -f "$ZIPFILE" ]; then
+	echo Error: "$ZIPFILE" already exists.
+	exit 2
+fi
+
+if [ -f "${DIR}/$(basename "$ZIPFILE")" ]; then
+	echo "$ZIPFILE" already exists within "$DIR"
+	echo
+	exit 0
+fi
+
+# cd "$(dirname "$DIR")"
+# DIR="$(basename "$DIR")"
+# ZIPFILE="${DIR%/}.cbz"
+
+
+function list_images() {
+	local IFS="$(printf "\x1E\n")"
+	find "$1" -exec file --separator "$IFS" {} \; \
+		| grep -i "image data\|ASCII text" \
+		| cut -d "$IFS" -f 1 - \
+		| sort --version-sort
+}
+
+find "$DIR" -name ".DS_Store" -delete
+list_images "$DIR" | zip -0 -m --latest-time "$ZIPFILE" -@
+
+if [ ! -f "$ZIPFILE" ]; then
+	echo Error: "$ZIPFILE" was not created.
+	exit 3
+fi
+echo Created "$ZIPFILE"
+
+# zip -0 --latest-time -r -m "$ZIPFILE" "$DIR" \
+# 	-i '*.jpeg' -i '*.jpg' -i '*.gif' -i '*.png' -i '*.svg' -i '*.webp' \
+# 	-i '*.JPEG' -i '*.JPG' -i '*.GIF' -i '*.PNG' -i '*.SVG' -i '*.WEBP'
+
+find "$DIR" -type d -empty -delete
+
+if [ -d "$DIR" ]; then
+	mv "$ZIPFILE" "$DIR"/
+fi
+
