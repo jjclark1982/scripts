@@ -22,6 +22,7 @@ import json
 import os
 import re
 import shutil
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -77,7 +78,7 @@ class FileDateInfo:
         return "\n".join(lines)
 
 
-def date_is_plausible(date):
+def is_date_plausible(date):
     if date is None:
         return False
     too_old = datetime(1971, 1, 1, tzinfo=timezone.utc)
@@ -86,7 +87,7 @@ def date_is_plausible(date):
 
 
 def min_valid_date(dates):
-    valid_dates = sorted([d for d in dates if date_is_plausible(d)])
+    valid_dates = sorted([d for d in dates if is_date_plausible(d)])
     if len(valid_dates) == 0:
         return None
 
@@ -152,7 +153,7 @@ def parse_date_from_text(s):
     if match:
         try:
             date = dateutil.parser.parse(match[0], fuzzy=False, default=datetime(1970,1,1, tzinfo=timezone.utc))
-            if date_is_plausible(date):
+            if is_date_plausible(date):
                 return date
         except dateutil.parser.ParserError:
             pass
@@ -191,6 +192,18 @@ def get_dates_from_filesystem(filename):
         creation_time = subprocess.run(['GetFileInfo', '-d', filename], capture_output=True).stdout
         dates['File Created'] = dateutil.parser.parse(creation_time).astimezone(timezone.utc)
     return dates
+
+
+def set_filesystem_times(filename, atime=None, mtime=None, creation_time=None):
+    if atime is None:
+        atime = datetime.now()
+    if mtime:
+        os.utime(filename, times=(atime.timestamp(), mtime.timestamp()))
+    if creation_time:
+        if shutil.which('SetFile'):
+            date = creation_time
+            date_str = f"{date.month}/{date.day}/{date.year} {date.hour}:{date.minute}:{date.second}"
+            subprocess.run(['SetFile', '-d', date_str, filename])
 
 
 def get_dates_from_multimedia(filename):
@@ -252,32 +265,6 @@ def get_dates_from_exif(filename):
 
     return dates
 
-
-def set_filesystem_times(filename, atime=None, mtime=None, creation_time=None):
-    if atime is None:
-        atime = datetime.now()
-    if mtime:
-        os.utime(filename, times=(atime.timestamp(), mtime.timestamp()))
-    if creation_time:
-        if shutil.which('SetFile'):
-            date = creation_time
-            date_str = f"{date.month}/{date.day}/{date.year} {date.hour}:{date.minute}:{date.second}"
-            subprocess.run(['SetFile', '-d', date_str, filename])
-
-
-def expand_paths(paths):
-    results = set()
-    for path in paths:
-        if '*' in str(path):
-            results.update(map(Path, glob.iglob(str(path), recursive=True)))
-        elif path.is_dir():
-            results.update(map(Path, glob.iglob(str(path / "**/*"), recursive=True)))
-        elif path.exists():
-            results.add(path)
-
-    return [p for p in sorted(results) if not p.is_dir()]
-
-
 class DateScraper:
     """
     Utility to read dates from various types of file metadata,
@@ -294,34 +281,53 @@ class DateScraper:
         )
         parser.add_argument('paths', nargs='+', type=Path, help='paths to process')
         parser.add_argument('--rewrite-mtime', action='store_true', help='paths to process')
+        parser.add_argument('--verbose', action='store_true', default=True)
+        parser.add_argument('--quiet', dest='verbose', action='store_false')
         args = parser.parse_args()
 
-        scraper = DateScraper(*args.paths)
+        scraper = DateScraper(*args.paths, **args.__dict__)
+        scraper.run(**args.__dict__)
 
-        for file_info in scraper.files:
-            if sys.stdout.isatty():
-                print(file_info.pretty_str())
-            else:
-                print(file_info)
-
-            if args.rewrite_mtime:
-                if file_info.dates['File Modified'] != file_info.earliest_date:
-                    file_info.set_mtime_to_earliest()
-                    print(f"Changed modification time to {file_info.earliest_date}")
-
-            print()
-
-
-    def __init__(self, *paths):
+    def __init__(self, *paths, verbose=False, **kwargs):
         all_paths = expand_paths(paths)
-        self.files = [*map(FileDateInfo, all_paths)]
+        self.files = map(FileDateInfo, all_paths)
 
-    def print(self):
+    def run(self, verbose=False, rewrite_mtime=False, **kwargs):
+        n_read = 0
+        n_written = 0
         for file_info in self.files:
-            if sys.stdout.isatty():
-                print(file_info.pretty_str(), "\n")
-            else:
-                print(file_info, "\n")
+            n_read += 1
+            if verbose:
+                if sys.stdout.isatty():
+                    print(file_info.pretty_str())
+                else:
+                    print(file_info)
+
+            if rewrite_mtime:
+                prev_mtime = file_info.dates['File Modified']
+                if prev_mtime != file_info.earliest_date:
+                    file_info.set_mtime_to_earliest()
+                    print(f"{shlex.quote(str(file_info.path))}: Changed modification time from '{prev_mtime}' to '{file_info.earliest_date}'")
+                    n_written += 1
+    
+            if verbose:
+                print()
+
+        if verbose:
+            print(f"{self.__class__.__name__}: Read {n_read} files. Updated {n_written} files.")
+
+
+def expand_paths(paths):
+    results = set()
+    for path in paths:
+        if path.is_dir():
+            results.update(map(Path, glob.iglob(str(path / "**/*"), recursive=True)))
+        elif path.exists():
+            results.add(path)
+        else:
+            results.update(map(Path, glob.iglob(str(path), recursive=True)))
+
+    return [p for p in sorted(results) if not p.is_dir()]
 
 
 if __name__ == "__main__":
