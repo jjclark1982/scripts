@@ -1,0 +1,16 @@
+#!/bin/sh
+
+export GIT_DIR="$HOME/.dotfiles.git"
+export GIT_WORK_TREE="$HOME"
+exec git $@
+
+
+# Portable dotfiles system based on this technique:
+# https://yokekeong.com/note-on-tracking-dotfiles-across-multiple-instances-easily-with-git/
+
+# To install:
+git clone --bare git@github.com:USERNAME/dotfiles.git ~/.dotfiles.git
+GIT_DIR=~/.dotfiles.git GIT_WORK_TREE=~ git checkout
+
+# and make sure ~/bin is in your PATH, then you can run:
+dit config --local status.showUntrackedFiles no

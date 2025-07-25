@@ -1,0 +1,19 @@
+#!/bin/bash
+[ -z "$*" ] && echo "What manual page do you want?" && return 0
+IFS=$'\n'
+cd /tmp
+for MANFILE in $(man -w "$@") ; do
+    [ -e "$MANFILE" ] || continue
+    HTMLFILE="/tmp/$(basename "$MANFILE").html"
+    if [ \! -e "$HTMLFILE" ] ; then 
+        case $MANFILE in
+            *.gz)
+                gunzip < $MANFILE | groff -Thtml -man > $HTMLFILE
+            ;;
+            *)
+                groff -Thtml -man $MANFILE > $HTMLFILE
+            ;;
+        esac
+    fi
+    open "file://$HTMLFILE"
+done

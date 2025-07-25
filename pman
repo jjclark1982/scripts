@@ -1,0 +1,2 @@
+#!/bin/sh
+man -t "$@" | open -f -a /Applications/Preview.app

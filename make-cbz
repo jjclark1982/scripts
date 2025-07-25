@@ -1,0 +1,82 @@
+#!/bin/sh -e -u
+
+# Create a .CBZ file of all the images in a directory.
+# Leave non-image files in place.
+
+# Example:
+# > make-cbz images/
+# ...
+# Created images.cbz
+
+# Example: zip all subdirectories
+# > for f in */; do make-cbz "$f"; done
+# ...
+# Created a.cbz
+# Created b.cbz
+# Created c.cbz
+
+echo
+DIR="$1"
+shift
+if [ ! -d "$DIR" ]; then
+	echo Error: "$DIR" is not a directory. Cancelled.
+	exit 1
+fi
+
+# Work relative to parent folder of dir, to simplify path within zip file
+cd "$DIR"
+cd ..
+DIR="$(basename "$DIR")"
+ZIPFILE="${DIR%/}.cbz"
+
+if [ -f "$ZIPFILE" ]; then
+	echo Error: "$ZIPFILE" already exists. Cancelled.
+	exit 2
+fi
+
+if [ -f "${DIR}/$(basename "$ZIPFILE")" ]; then
+	echo "$ZIPFILE" already exists within "$DIR". Skipped.
+	echo
+	exit 0
+fi
+echo Creating "$ZIPFILE"...
+
+
+# Simple command to zip only common image suffixes
+# zip -0 --latest-time -m -r "$ZIPFILE" "$DIR" \
+# 	-i '*.jpeg' -i '*.jpg' -i '*.gif' -i '*.png' -i '*.svg' -i '*.webp' \
+# 	-i '*.JPEG' -i '*.JPG' -i '*.GIF' -i '*.PNG' -i '*.SVG' -i '*.WEBP'
+
+# Function to identify image files based on contents
+function list_images() {
+	local IFS="$(printf "\x1E\n")"
+	find "$1" -exec file --separator "$IFS" {} \; \
+		| grep -i "image data" \
+		| cut -d "$IFS" -f 1 - \
+		| sort --version-sort
+}
+
+if [ -z "$(list_images .)" ]; then
+	echo No image files found in "$DIR". Skipped.
+	exit 0
+fi
+
+# Zip identified images with no compression, and remove original files
+list_images "$DIR" | zip -0 --latest-time -m "$ZIPFILE" -@
+
+if [ ! -f "$ZIPFILE" ]; then
+	echo $0: Error: "$ZIPFILE" was not created.
+	exit 3
+fi
+echo Created "$ZIPFILE"
+
+# Remove empty directories.
+# TODO: check how this handles @eaDir
+find "$DIR" -name ".DS_Store" -delete
+find "$DIR" -type d -empty -delete
+
+# If main directory was not empty, move zipfile into it to stay with related files.
+if [ -d "$DIR" ]; then
+	mv "$ZIPFILE" "$DIR"/
+	echo Moved "$ZIPFILE" into "$DIR/"
+fi
