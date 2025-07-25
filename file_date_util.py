@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# File Date Utility
+# Date Scraper
 # use cases:
 # - read all dates of a file
 # - set mtime based on metadata or filename
@@ -240,7 +240,7 @@ def get_dates_from_exif(filename):
     d = gps_ifd.get(ExifTags.GPS.GPSDateStamp)
     t = gps_ifd.get(ExifTags.GPS.GPSTimeStamp)
     if d:
-        dates["Exif GPSDateStamp"] = dateutil.parser.parse(' '.join(d or '', t or '')).astimezone(timezone.utc)
+        dates["Exif GPSDateStamp"] = dateutil.parser.parse(' '.join([d or '', t or ''])).astimezone(timezone.utc)
 
     return dates
 
@@ -257,26 +257,12 @@ def set_filesystem_times(filename, atime=None, mtime=None, creation_time=None):
             subprocess.run(['SetFile', '-d', date_str, filename])
 
 
-def set_dates(pathname='**/*.mp4'):
-    """
-    Set file modification and creation dates based on filename and content metadata.
-    """
-    for filename in glob.iglob(pathname, recursive=True):
-        print(filename)
-        
-        all_dates = [
-            *get_dates_from_filename(filename),
-            *get_dates_from_filesystem(filename),
-            *get_dates_from_metadata(filename)
-        ]
-
-        print(min_valid_date(all_dates))
-
-
 def expand_paths(paths):
     results = set()
     for path in paths:
-        if path.is_dir():
+        if '*' in str(path):
+            results.update(map(Path, glob.iglob(str(path), recursive=True)))
+        elif path.is_dir():
             results.update(map(Path, glob.iglob(str(path / "**/*"), recursive=True)))
         elif path.exists():
             results.add(path)
@@ -284,28 +270,36 @@ def expand_paths(paths):
     return [p for p in sorted(results) if not p.is_dir()]
 
 
-def main():
-    import argparse
-    import sys
+class DateScraper:
+    """
+    Utility to read dates from various types of file metadata,
+    and write dates to file creation and modification time.
+    """
 
-    parser = argparse.ArgumentParser(
-        description=set_dates.__doc__
-    )
-    parser.add_argument('paths', nargs='+', type=Path)# default='**/*.mp4')
-    args = parser.parse_args()
+    @classmethod
+    def main_cli(cls):
+        import argparse
+        import sys
 
-    all_paths = expand_paths(args.paths)
+        parser = argparse.ArgumentParser(
+            prog=cls.__name__,
+            description=cls.__doc__
+        )
+        parser.add_argument('paths', nargs='+', type=Path, help='paths to process')
+        args = parser.parse_args()
 
-    for path in all_paths:
-        info = FileDateInfo(path)
-        if sys.stdout.isatty():
-            print(info.pretty_str(), "\n")
-        else:
-            print(info, "\n")
+        all_paths = expand_paths(args.paths)
+
+        for path in all_paths:
+            info = FileDateInfo(path)
+            if sys.stdout.isatty():
+                print(info.pretty_str(), "\n")
+            else:
+                print(info, "\n")
 
 
 if __name__ == "__main__":
-    main()
+    DateScraper.main_cli()
 
 
 def test_get_date_from_text():
