@@ -47,10 +47,17 @@ class FileDateInfo:
 
         self.dates.update(get_dates_from_filename(self.path))
         self.dates.update(get_dates_from_filesystem(self.path))
-        self.dates.update(get_dates_from_video_metadata(self.path))
+        self.dates.update(get_dates_from_multimedia(self.path))
         self.dates.update(get_dates_from_exif(self.path))
 
         self.earliest_date = min_valid_date(self.dates.values())
+
+    def set_mtime_to_earliest(self):
+        set_filesystem_times(
+            self.path,
+            atime=self.dates['File Accessed'],
+            mtime=self.earliest_date
+        )
 
     def __str__(self):
         lines = [str(self.path)]
@@ -186,7 +193,7 @@ def get_dates_from_filesystem(filename):
     return dates
 
 
-def get_dates_from_video_metadata(filename):
+def get_dates_from_multimedia(filename):
     dates = {}
     if shutil.which('ffprobe'):
         ffprobe_result = subprocess.run([
@@ -286,11 +293,24 @@ class DateScraper:
             description=cls.__doc__
         )
         parser.add_argument('paths', nargs='+', type=Path, help='paths to process')
+        parser.add_argument('--rewrite-mtime', action='store_true', help='paths to process')
         args = parser.parse_args()
 
         scraper = DateScraper(*args.paths)
 
-        scraper.print()
+        for file_info in scraper.files:
+            if sys.stdout.isatty():
+                print(file_info.pretty_str())
+            else:
+                print(file_info)
+
+            if args.rewrite_mtime:
+                if file_info.dates['File Modified'] != file_info.earliest_date:
+                    file_info.set_mtime_to_earliest()
+                    print(f"Changed modification time to {file_info.earliest_date}")
+
+            print()
+
 
     def __init__(self, *paths):
         all_paths = expand_paths(paths)
