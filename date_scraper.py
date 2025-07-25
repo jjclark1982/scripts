@@ -23,6 +23,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 import uuid
 
@@ -279,23 +280,28 @@ class DateScraper:
     @classmethod
     def main_cli(cls):
         import argparse
-        import sys
 
         parser = argparse.ArgumentParser(
-            prog=cls.__name__,
+            # prog=cls.__name__,
             description=cls.__doc__
         )
         parser.add_argument('paths', nargs='+', type=Path, help='paths to process')
         args = parser.parse_args()
 
-        all_paths = expand_paths(args.paths)
+        scraper = DateScraper(*args.paths)
 
-        for path in all_paths:
-            info = FileDateInfo(path)
+        scraper.print()
+
+    def __init__(self, *paths):
+        all_paths = expand_paths(paths)
+        self.files = [*map(FileDateInfo, all_paths)]
+
+    def print(self):
+        for file_info in self.files:
             if sys.stdout.isatty():
-                print(info.pretty_str(), "\n")
+                print(file_info.pretty_str(), "\n")
             else:
-                print(info, "\n")
+                print(file_info, "\n")
 
 
 if __name__ == "__main__":
