@@ -1,5 +1,6 @@
 #!/bin/sh -e -u
 
+# make-cbz.sh
 # Create a .CBZ file of all the images in a directory.
 # Leave non-image files in place.
 
@@ -23,20 +24,19 @@ if [ ! -d "$DIR" ]; then
 	exit 1
 fi
 
-# Work relative to parent folder of dir, to simplify path within zip file
+# Work relative to parent folder of dir, to simplify path within zip file.
 cd "$DIR"
+DIR="$(basename "$PWD")"
 cd ..
-DIR="$(basename "$DIR")"
-ZIPFILE="${DIR%/}.cbz"
 
+# Check whether this zipfile has already been created.
+ZIPFILE="${DIR%/}.cbz"
 if [ -f "$ZIPFILE" ]; then
 	echo Error: "$ZIPFILE" already exists. Cancelled.
 	exit 2
 fi
-
 if [ -f "${DIR}/$(basename "$ZIPFILE")" ]; then
 	echo "$ZIPFILE" already exists within "$DIR". Skipped.
-	echo
 	exit 0
 fi
 echo Creating "$ZIPFILE"...
@@ -44,33 +44,34 @@ echo Creating "$ZIPFILE"...
 
 # Simple command to zip only common image suffixes
 # zip -0 --latest-time -m -r "$ZIPFILE" "$DIR" \
-# 	-i '*.jpeg' -i '*.jpg' -i '*.gif' -i '*.png' -i '*.svg' -i '*.webp' \
-# 	-i '*.JPEG' -i '*.JPG' -i '*.GIF' -i '*.PNG' -i '*.SVG' -i '*.WEBP'
+# 	-i '*.jpeg' -i '*.jpg' -i '*.gif' -i '*.png' -i '*.svg' -i '*.webp' -i '*.heic' \
+# 	-i '*.JPEG' -i '*.JPG' -i '*.GIF' -i '*.PNG' -i '*.SVG' -i '*.WEBP' -i '*.HEIC'
 
 # Function to identify image files based on contents
 function list_images() {
-	local IFS="$(printf "\x1E\n")"
+	local IFS="$(printf "\x1E")"
 	find "$1" -exec file --separator "$IFS" {} \; \
-		| grep -i "image data" \
+		| grep -i "$IFS.*\\bImage\\b" \
 		| cut -d "$IFS" -f 1 - \
 		| sort --version-sort
 }
 
-if [ -z "$(list_images .)" ]; then
-	echo No image files found in "$DIR". Skipped.
-	exit 0
-fi
+# if [ -z "$(list_images .)" ]; then
+# 	echo No image files found in "$DIR". Skipped.
+# 	exit 0
+# fi
 
 # Zip identified images with no compression, and remove original files
 list_images "$DIR" | zip -0 --latest-time -m "$ZIPFILE" -@
 
 if [ ! -f "$ZIPFILE" ]; then
-	echo $0: Error: "$ZIPFILE" was not created.
+	echo Error: "$ZIPFILE" was not created.
 	exit 3
 fi
 echo Created "$ZIPFILE"
 
-# Remove empty directories.
+# Remove empty folders.
+# (zip -m is supposed to handle this but find is more thorough)
 # TODO: check how this handles @eaDir
 find "$DIR" -name ".DS_Store" -delete
 find "$DIR" -type d -empty -delete
