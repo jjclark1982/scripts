@@ -15,8 +15,10 @@
 # ffprobe -v quiet -print_format json -show_format -show_streams input.m4v
 
 
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 import dateutil.parser
+from functools import cached_property
 import glob
 import json
 import os
@@ -38,20 +40,25 @@ except ModuleNotFoundError:
     pass
 
 
+@dataclass
 class FileDateInfo:
-    def __init__(self, filename):
-        self.path = Path(filename)
-        if not self.path.exists():
-            raise ValueError(f"File '{filename}' does not exist")
+    """
+    Lazy-loading interface to scraping and parsing various file dates.
+    """
+    path: Path
 
-        self.dates = {}
+    @cached_property
+    def dates(self):
+        dates = {}
+        dates.update(get_dates_from_filename(self.path))
+        dates.update(get_dates_from_filesystem(self.path))
+        dates.update(get_dates_from_multimedia(self.path))
+        dates.update(get_dates_from_exif(self.path))
+        return dates
 
-        self.dates.update(get_dates_from_filename(self.path))
-        self.dates.update(get_dates_from_filesystem(self.path))
-        self.dates.update(get_dates_from_multimedia(self.path))
-        self.dates.update(get_dates_from_exif(self.path))
-
-        self.earliest_date = min_valid_date(self.dates.values())
+    @cached_property
+    def earliest_date(self):
+        return min_valid_date(self.dates.values())
 
     def set_mtime_to_earliest(self):
         set_filesystem_times(
@@ -81,7 +88,7 @@ class FileDateInfo:
 def is_date_plausible(date):
     if date is None:
         return False
-    too_old = datetime(1971, 1, 1, tzinfo=timezone.utc)
+    too_old = datetime(1971, 1, 2, tzinfo=timezone.utc)
     too_new = datetime.now().astimezone() + timedelta(days=365*5)
     return (too_old < date < too_new)
 
@@ -133,23 +140,24 @@ def parse_date_from_uuid(s):
     return None
 
 
-def parse_date_from_text(s):
-    # detect date in parentheses
-    match = re.search(r"\((\d{4}[\d./-]*)\)", s)
+def parse_date_from_text(text):
+    # detect full year in parentheses
+    match = re.search(r"\((\d{4}[\d./-]*)\)", text)
     if match:
         fields = [*map(int, re.split(r"[./-]", match[1]))]
         if len(fields) == 3:
-            # full date detected
+            # YYYY-MM-DD detected
             return datetime(*fields, tzinfo=timezone.utc)
         elif len(fields) == 2:
-            # year and month detected - mark as the last day of the month
+            # YYYY-MM detected - mark as the last day of the month
             return datetime(fields[0], fields[1] + 1, 1, tzinfo=timezone.utc) - timedelta(days=1)
         elif len(fields) == 1:
-            # only year detected - mark as the last day of the year
+            # YYYY detected - mark as the last day of the year
             return datetime(fields[0] + 1, 1, 1, tzinfo=timezone.utc) - timedelta(days=1)
 
     # try to detect any date (watch out for false positives)
-    match = re.search(r"\b\d{4}[\d./-]*\b", s)
+
+    match = re.search(r"\b\d{4}[\d./-]*\b", text)
     if match:
         try:
             date = dateutil.parser.parse(match[0], fuzzy=False, default=datetime(1970,1,1, tzinfo=timezone.utc))
@@ -157,6 +165,14 @@ def parse_date_from_text(s):
                 return date
         except dateutil.parser.ParserError:
             pass
+
+    # try:
+    #     date = dateutil.parser.parse(text, fuzzy=True, default=datetime(1970,1,1, tzinfo=timezone.utc))
+    #     if is_date_plausible(date):
+    #         return date
+    # except dateutil.parser.ParserError:
+    #     pass
+
 
     return None
 
@@ -291,12 +307,14 @@ class DateScraper:
     def __init__(self, *paths, verbose=False, **kwargs):
         all_paths = expand_paths(paths)
         self.files = map(FileDateInfo, all_paths)
+        self.n_files = len(all_paths)
 
     def run(self, verbose=False, rewrite_mtime=False, **kwargs):
-        n_read = 0
+        if verbose and self.n_files > 1:
+            print(f"{self.__class__.__name__}: Reading {self.n_files} files...\n")
+
         n_written = 0
         for file_info in self.files:
-            n_read += 1
             if verbose:
                 if sys.stdout.isatty():
                     print(file_info.pretty_str())
@@ -307,14 +325,14 @@ class DateScraper:
                 prev_mtime = file_info.dates['File Modified']
                 if prev_mtime != file_info.earliest_date:
                     file_info.set_mtime_to_earliest()
-                    print(f"{shlex.quote(str(file_info.path))}: Changed modification time from '{prev_mtime}' to '{file_info.earliest_date}'")
+                    print(f"Changed modification time of {shlex.quote(str(file_info.path))} from '{prev_mtime}' to '{file_info.earliest_date}'")
                     n_written += 1
     
             if verbose:
                 print()
 
-        if verbose:
-            print(f"{self.__class__.__name__}: Read {n_read} files. Updated {n_written} files.")
+        if verbose and n_written > 0:
+            print(f"{self.__class__.__name__}: Updated {n_written} / {self.n_files} files.")
 
 
 def expand_paths(paths):
@@ -342,4 +360,4 @@ def test_get_date_from_text():
     assert get_date_from_text("abc 1753386545083 xyz") == datetime(2025, 7, 24, 19, 49, 5, 83000, tzinfo=timezone.utc)
     assert get_date_from_text("abc 1753386545 xyz   ") == datetime(2025, 7, 24, 19, 49, 5, tzinfo=timezone.utc)
     assert get_date_from_text("abc ae4e6160-68c2-11f0-b558-1800200c9a66 xyz") == datetime(2025, 7, 24, 19, 16, 20, 580183, tzinfo=timezone.utc)
-
+    assert get_date_from_text("Photo May 19 2023, 11 59 04 PM.jpg") == datetime(2023, 5, 19, 23, 59, 4, tzinfo=timezone.utc)
