@@ -1,4 +1,4 @@
-#!/bin/sh -e -u
+#!/bin/sh -u
 
 # make-cbz.sh
 # Create a .CBZ file of all the images in a directory.
@@ -10,42 +10,13 @@
 # Created images.cbz
 
 # Example: zip all subdirectories
-# > for f in */; do make-cbz "$f"; done
+# > make-cbz */
 # ...
 # Created a.cbz
 # Created b.cbz
 # Created c.cbz
 
-echo
-DIR="$1"
-shift
-if [ ! -d "$DIR" ]; then
-	echo Error: "$DIR" is not a directory. Cancelled.
-	exit 1
-fi
-
-# Work relative to parent folder of dir, to simplify path within zip file.
-cd "$DIR"
-DIR="$(basename "$PWD")"
-cd ..
-
-# Check whether this zipfile has already been created.
-ZIPFILE="${DIR%/}.cbz"
-if [ -f "$ZIPFILE" ]; then
-	echo Error: "$ZIPFILE" already exists. Cancelled.
-	exit 2
-fi
-if [ -f "${DIR}/$(basename "$ZIPFILE")" ]; then
-	echo "$ZIPFILE" already exists within "$DIR". Skipped.
-	exit 0
-fi
-echo Creating "$ZIPFILE"...
-
-
-# Simple command to zip only common image suffixes
-# zip -0 --latest-time -m -r "$ZIPFILE" "$DIR" \
-# 	-i '*.jpeg' -i '*.jpg' -i '*.gif' -i '*.png' -i '*.svg' -i '*.webp' -i '*.heic' -i '*.avif' \
-# 	-i '*.JPEG' -i '*.JPG' -i '*.GIF' -i '*.PNG' -i '*.SVG' -i '*.WEBP' -i '*.HEIC' -i '*.AVIF'
+SUFFIX=".cbz"
 
 # Function to identify image files based on contents
 function list_images() {
@@ -68,28 +39,69 @@ function select_images() {
     done
 }
 
-# if [ -z "$(list_images .)" ]; then
-# 	echo No image files found in "$DIR". Skipped.
-# 	exit 0
-# fi
+function make_cbz() {
+  (
+  	# Run in a subshell that will exit on the first error
+	set -e
 
-# Zip identified images with no compression, and remove original files
-list_images "$DIR" | zip -0 --latest-time -m "$ZIPFILE" -@
+	DIR="$1"
+	if [ ! -d "$DIR" ]; then
+		echo Error: "$DIR" is not a directory. Skipped.
+		return 1
+	fi
 
-if [ ! -f "$ZIPFILE" ]; then
-	echo Error: "$ZIPFILE" was not created.
-	exit 3
-fi
-echo Created "$ZIPFILE"
+	# Work relative to parent folder of DIR, to standardize paths within zip files.
+	cd "$DIR"
+	DIR="$(basename "$PWD")"
+	cd ..
 
-# Remove empty folders.
-# (zip -m is supposed to handle this but find is more thorough)
-# TODO: check how this handles @eaDir
-find "$DIR" -name ".DS_Store" -delete
-find "$DIR" -type d -empty -delete
+	# Check whether this zipfile has already been created.
+	ZIPFILE="${DIR%/}$SUFFIX"
+	if [ -f "$ZIPFILE" ]; then
+		echo Error: "$ZIPFILE" already exists. Skipped.
+		return 2
+	fi
+	if [ -f "${DIR}/$(basename "$ZIPFILE")" ]; then
+		echo "$ZIPFILE" already exists within "$DIR". Skipped.
+		return 0
+	fi
+	echo Creating "$ZIPFILE"...
 
-# If main directory was not empty, move zipfile into it to stay with related files.
-if [ -d "$DIR" ]; then
-	mv "$ZIPFILE" "$DIR"/
-	echo Moved "$ZIPFILE" into "$DIR/"
-fi
+	# Simple command to zip only common image suffixes
+	# zip -0 --latest-time -m -r "$ZIPFILE" "$DIR" \
+	# 	-i '*.jpeg' -i '*.jpg' -i '*.gif' -i '*.png' -i '*.svg' -i '*.webp' -i '*.heic' -i '*.avif' \
+	# 	-i '*.JPEG' -i '*.JPG' -i '*.GIF' -i '*.PNG' -i '*.SVG' -i '*.WEBP' -i '*.HEIC' -i '*.AVIF'
+
+	# if [ -z "$(list_images .)" ]; then
+	# 	echo No image files found in "$DIR". Skipped.
+	# 	return 0
+	# fi
+
+	# Zip identified images with no compression, and remove original files
+	list_images "$DIR" | zip -0 --latest-time -m "$ZIPFILE" -@
+
+	if [ ! -f "$ZIPFILE" ]; then
+		echo Error: "$ZIPFILE" was not created.
+		return 3
+	fi
+	echo Created "$ZIPFILE"
+
+	# Remove empty folders.
+	# (zip -m is supposed to handle this but find is more thorough)
+	# TODO: check how this handles @eaDir
+	find "$DIR" -name ".DS_Store" -delete
+	find "$DIR" -type d -empty -delete
+
+	# If main directory was not empty, move zipfile into it to stay with related files.
+	if [ -d "$DIR" ]; then
+		mv "$ZIPFILE" "$DIR"/
+		echo Moved "$ZIPFILE" into "$DIR/"
+	fi
+  )
+}
+
+# Loop over command-line arguments
+for DIR; do
+	echo
+	make_cbz "$DIR"
+done
