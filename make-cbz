@@ -44,16 +44,28 @@ echo Creating "$ZIPFILE"...
 
 # Simple command to zip only common image suffixes
 # zip -0 --latest-time -m -r "$ZIPFILE" "$DIR" \
-# 	-i '*.jpeg' -i '*.jpg' -i '*.gif' -i '*.png' -i '*.svg' -i '*.webp' -i '*.heic' \
-# 	-i '*.JPEG' -i '*.JPG' -i '*.GIF' -i '*.PNG' -i '*.SVG' -i '*.WEBP' -i '*.HEIC'
+# 	-i '*.jpeg' -i '*.jpg' -i '*.gif' -i '*.png' -i '*.svg' -i '*.webp' -i '*.heic' -i '*.avif' \
+# 	-i '*.JPEG' -i '*.JPG' -i '*.GIF' -i '*.PNG' -i '*.SVG' -i '*.WEBP' -i '*.HEIC' -i '*.AVIF'
 
 # Function to identify image files based on contents
 function list_images() {
-	local IFS="$(printf "\x1E")"
-	find "$1" -exec file --separator "$IFS" {} \; \
-		| grep -i "$IFS.*\\bImage\\b" \
-		| cut -d "$IFS" -f 1 - \
-		| sort --version-sort
+	find "$1" \
+		| sort --version-sort \
+		| select_images
+}
+
+function select_images() {
+    local filename
+    while read -r filename; do
+        [ -f "$filename" ] || continue # must be a regular file
+    	case "$(file "$filename")" in
+    		*"image"* |\
+			*"Image"* |\
+			*"Picture"* )
+				echo "$filename"
+				;;
+		esac
+    done
 }
 
 # if [ -z "$(list_images .)" ]; then
