@@ -1,31 +1,37 @@
-#!/bin/sh -u
+#!/bin/sh -uo pipefail
 
 # make-cbz.sh
 # Create a .CBZ file of all the images in a directory.
 # Leave non-image files in place.
-
+#
 # Example:
 # > make-cbz images/
 # ...
 # Created images.cbz
-
-# Example: zip all subdirectories
+#
+# Example: zip all subdirectories individually
 # > make-cbz */
 # ...
 # Created a.cbz
 # Created b.cbz
 # Created c.cbz
+#
+# Example: use a different extension (default .cbz)
+# > EXTENSION=zip make-cbz images/
+# ...
+# Created images.zip
 
-SUFFIX=".cbz"
 
-# Function to identify image files based on contents
+EXTENSION=".${EXTENSION:-cbz}"
+
+# Function to identify image files based on content
 function list_images() {
 	find "$1" \
 		| sort --version-sort \
-		| select_images
+		| filter_images
 }
 
-function select_images() {
+function filter_images() {
     local filename
     while read -r filename; do
         [ -f "$filename" ] || continue # must be a regular file
@@ -39,10 +45,9 @@ function select_images() {
     done
 }
 
-function make_cbz() {
-  (
+function zip_images_in_dir() { (
   	# Run in a subshell that will exit on the first error
-	set -e
+  	set -e
 
 	DIR="$1"
 	if [ ! -d "$DIR" ]; then
@@ -56,25 +61,25 @@ function make_cbz() {
 	cd ..
 
 	# Check whether this zipfile has already been created.
-	ZIPFILE="${DIR%/}$SUFFIX"
+	ZIPFILE="${DIR%/}$EXTENSION"
 	if [ -f "$ZIPFILE" ]; then
 		echo Error: "$ZIPFILE" already exists. Skipped.
 		return 2
 	fi
 	if [ -f "${DIR}/$(basename "$ZIPFILE")" ]; then
 		echo "$ZIPFILE" already exists within "$DIR". Skipped.
-		return 0
+		return 3
 	fi
 	echo Creating "$ZIPFILE"...
 
-	# Simple command to zip only common image suffixes
+	# Simple command to zip only common image extensions
 	# zip -0 --latest-time -m -r "$ZIPFILE" "$DIR" \
 	# 	-i '*.jpeg' -i '*.jpg' -i '*.gif' -i '*.png' -i '*.svg' -i '*.webp' -i '*.heic' -i '*.avif' \
 	# 	-i '*.JPEG' -i '*.JPG' -i '*.GIF' -i '*.PNG' -i '*.SVG' -i '*.WEBP' -i '*.HEIC' -i '*.AVIF'
 
 	# if [ -z "$(list_images .)" ]; then
 	# 	echo No image files found in "$DIR". Skipped.
-	# 	return 0
+	# 	return 4
 	# fi
 
 	# Zip identified images with no compression, and remove original files
@@ -82,7 +87,7 @@ function make_cbz() {
 
 	if [ ! -f "$ZIPFILE" ]; then
 		echo Error: "$ZIPFILE" was not created.
-		return 3
+		return 5
 	fi
 	echo Created "$ZIPFILE"
 
@@ -97,11 +102,11 @@ function make_cbz() {
 		mv "$ZIPFILE" "$DIR"/
 		echo Moved "$ZIPFILE" into "$DIR/"
 	fi
-  )
-}
+	return 0
+) }
 
-# Loop over command-line arguments
+# Main routine: loop over command-line arguments
 for DIR; do
 	echo
-	make_cbz "$DIR"
+	zip_images_in_dir "$DIR"
 done
