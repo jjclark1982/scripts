@@ -30,6 +30,7 @@ import sys
 from pathlib import Path
 import uuid
 
+from pypdf import PdfReader, PdfStreamError
 from PIL import Image
 import PIL.ExifTags as ExifTags
 try:
@@ -247,6 +248,22 @@ def get_dates_from_xattr(filename):
     return dates
 
 
+def get_dates_from_pdf(filename):
+    dates = {}
+    if filename.suffix.lower() == '.pdf':
+        try:
+            reader = PdfReader(filename)
+            meta = reader.metadata
+            if meta.creation_date is not None:
+                dates["PDF Creation Date"] = meta.creation_date
+            if meta.modification_date is not None:
+                dates["PDF Modification Date"] = meta.modification_date
+        except PdfStreamError:
+            # not a valid pdf
+            pass
+    return dates
+
+
 def get_dates_from_media(filename):
     dates = {}
     if shutil.which('ffprobe'):
@@ -391,3 +408,4 @@ def test_get_date_from_text():
     "Screenshot 20200427 220511.jpg"
     "RDT 20221123 2347021999855542208290714.webp"
     "1308903232501100548 1.jpg"  # looks like a nanosecond timestamp but may be just a coincidence
+    "D:20241113002138Z00'00'"  # pdf raw date format
