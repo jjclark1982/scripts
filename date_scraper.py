@@ -99,25 +99,29 @@ def min_valid_date(dates):
         return None
 
     # if the minimum date is a truncated version of a more precise timestamp, return the more precise one
+    precise_times = [d for d in valid_dates if d.microsecond != 0]
+    if (len(precise_times) > 0) and (precise_times[0] - valid_dates[0] < timedelta(minutes=1)):
+        return precise_times[0]
+
     precise_dates = [d for d in valid_dates if d.hour != 0 or d.minute != 0 or d.second != 0]
     if (len(precise_dates) > 0) and (precise_dates[0] - valid_dates[0] < timedelta(days=1)):
         return precise_dates[0]
-    else:
-        return valid_dates[0]
+
+    return valid_dates[0]
 
 
 def parse_date_from_timestamp(s):
     # timestamps in filenames were not common before 10-digit numbers (ts 1_000_000_000 = Sep 2001)
     # but could be plausible for some 9-digit numbers (ts 500_000_000 = Nov 1985)
 
-    # detect timestamp with millisecond precision (e.g. from JavaScript)
+    # detect 13-digit timestamp with millisecond precision (e.g. from JavaScript)
     match = re.search(r"\b1\d{12}\b", s)
     if match:
         timestamp = int(match[0]) / 1000.0
         date = datetime.fromtimestamp(timestamp).astimezone(timezone.utc)
         return date
 
-    # detect timestamp with second precision (e.g. from imageboard uploads)
+    # detect 10-digit timestamp with second precision (e.g. from imageboard uploads)
     match = re.search(r"\b1\d{9}\b", s)
     if match:
         timestamp = int(match[0])
