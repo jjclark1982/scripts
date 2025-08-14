@@ -30,7 +30,8 @@ import sys
 from pathlib import Path
 import uuid
 
-from pypdf import PdfReader, PdfStreamError
+from pypdf import PdfReader
+from pypdf.errors import PyPdfError
 from PIL import Image
 import PIL.ExifTags as ExifTags
 try:
@@ -56,6 +57,8 @@ class FileDateInfo:
         dates.update(get_dates_from_xattr(self.path))
         dates.update(get_dates_from_media(self.path))
         dates.update(get_dates_from_exif(self.path))
+        if self.path.suffix.lower() == '.pdf':
+            dates.update(get_dates_from_pdf(self.path))
         return dates
 
     @cached_property
@@ -250,21 +253,26 @@ def get_dates_from_xattr(filename):
 
 def get_dates_from_pdf(filename):
     dates = {}
-    if filename.suffix.lower() == '.pdf':
-        try:
-            reader = PdfReader(filename)
-            meta = reader.metadata
-            if meta.creation_date is not None:
-                dates["PDF Creation Date"] = meta.creation_date
-            if meta.modification_date is not None:
-                dates["PDF Modification Date"] = meta.modification_date
-        except PdfStreamError:
-            # not a valid pdf
-            pass
+    try:
+        reader = PdfReader(filename)
+        meta = reader.metadata
+        if meta.creation_date is not None:
+            dates["PDF Creation Date"] = meta.creation_date
+        if meta.modification_date is not None:
+            dates["PDF Modification Date"] = meta.modification_date
+    except PyPdfError:
+        # not a valid pdf
+        pass
     return dates
 
 
 def get_dates_from_media(filename):
+    # Download video with upload_date in filename:
+    # yt-dlp -f mp4 -o "%(title)+.100U (%(upload_date>%Y-%m-%d)s) [%(id)s].%(ext)s" "$URL"
+    #
+    # Read video metadata
+    # ffprobe -v quiet -print_format json -show_format -show_streams input.m4v
+
     dates = {}
     if shutil.which('ffprobe'):
         ffprobe_result = subprocess.run([
