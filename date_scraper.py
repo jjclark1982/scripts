@@ -163,8 +163,7 @@ def parse_date_from_text(text):
             return datetime(fields[0] + 1, 1, 1, tzinfo=timezone.utc) - timedelta(days=1)
 
     # try to detect any date (watch out for false positives)
-
-    match = re.search(r"\b\d{4}[\d./-]*\b", text)
+    match = re.search(r"\b(?:19|20)\d{2}[\d./-]*\b", text)
     if match:
         try:
             date = dateutil.parser.parse(match[0], fuzzy=False, default=datetime(1970,1,1, tzinfo=timezone.utc))
