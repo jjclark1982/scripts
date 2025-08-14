@@ -52,6 +52,7 @@ class FileDateInfo:
         dates = {}
         dates.update(get_dates_from_filename(self.path))
         dates.update(get_dates_from_filesystem(self.path))
+        dates.update(get_dates_from_xattr(self.path))
         dates.update(get_dates_from_media(self.path))
         dates.update(get_dates_from_exif(self.path))
         return dates
@@ -226,6 +227,24 @@ def set_filesystem_times(filename, atime=None, mtime=None, creation_time=None):
             date = creation_time
             date_str = f"{date.month}/{date.day}/{date.year} {date.hour}:{date.minute}:{date.second}"
             subprocess.run(['SetFile', '-d', date_str, filename])
+
+
+def get_dates_from_xattr(filename):
+    dates = {}
+    if shutil.which('xattr'):
+        xattr_names = subprocess.run(['xattr', str(filename)], capture_output=True).stdout.decode().strip().split("\n")
+        for xattr_name in xattr_names:
+            match = re.search(r"(?i:date|time)", xattr_name)
+            if match:
+                xattr_value = subprocess.run(['xattr', '-p', xattr_name, str(filename)], capture_output=True).stdout
+                try:
+                    date = parse_date_from_text(xattr_value.decode())
+                    if date is not None:
+                        dates[f"Xattr {xattr_name}"] = date
+                except UnicodeDecodeError:
+                    # unknown binary data format in xattr value
+                    pass
+    return dates
 
 
 def get_dates_from_media(filename):
