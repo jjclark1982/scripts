@@ -7,14 +7,6 @@
 # - add date to filename
 # - add index to filename based on date order
 
-
-# Download video with upload_date in filename:
-# yt-dlp -f mp4 -o "%(title)+.100U (%(upload_date>%Y-%m-%d)s) [%(id)s].%(ext)s" "$URL"
-
-# Read video metadata
-# ffprobe -v quiet -print_format json -show_format -show_streams input.m4v
-
-
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 import dateutil.parser
@@ -116,18 +108,19 @@ def min_valid_date(dates):
 
 
 def parse_date_from_timestamp(s):
-    # timestamps in filenames were not common before 10-digit numbers (ts 1_000_000_000 = Sep 2001)
-    # but could be plausible for some 9-digit numbers (ts 500_000_000 = Nov 1985)
+    # Timestamps in filenames were not common before 10-digit numbers (ts 1_000_000_000 = Sep 2001)
+    # but could be plausible for some 9-digit numbers (ts 700_000_000 = Mar 1992)
+    # or eventually ambiguous with a written date (ts 1_990_000_000 = Jan 2033)
 
-    # detect 13-digit timestamp with millisecond precision (e.g. from JavaScript)
-    match = re.search(r"\b1\d{12}\b", s)
+    # Detect 13-digit timestamp with millisecond precision (e.g. from JavaScript)
+    match = re.search(r"(?:\b|_)1\d{12}(?:\b|_)", s)
     if match:
         timestamp = int(match[0]) / 1000.0
         date = datetime.fromtimestamp(timestamp).astimezone(timezone.utc)
         return date
 
-    # detect 10-digit timestamp with second precision (e.g. from imageboard uploads)
-    match = re.search(r"\b1\d{9}\b", s)
+    # Detect 10-digit timestamp with second precision (e.g. from imageboard uploads)
+    match = re.search(r"(?:\b|_)1\d{9}(?:\b|_)", s)
     if match:
         timestamp = int(match[0])
         date = datetime.fromtimestamp(timestamp).astimezone(timezone.utc)
@@ -137,7 +130,7 @@ def parse_date_from_timestamp(s):
 
 
 def parse_date_from_uuid(s):
-    # detect timestamp in UUID v1
+    # Detect timestamp in UUID v1
     uuid_re = r"(?i:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})"
     match = re.search(uuid_re, s)
     if match:
@@ -150,8 +143,8 @@ def parse_date_from_uuid(s):
 
 
 def parse_date_from_text(text):
-    # detect full year in parentheses
-    match = re.search(r"(?:\(|^)((?:19|20)\d{2}(?:[\s.:/-]\d{1,2}){0,5})(?:\)|$|\.)", text)
+    # Detect date with full year, in parentheses or other delimiters
+    match = re.search(r"(?:\(|^|[.:/_-]|\b)((?:19|20)\d{2}(?:[\s.:/_-]\d{1,2}){0,5})(?:\)|$|\b|[.:/_-])", text)
     if match:
         fields = [*map(int, re.split(r"\D", match[1]))]
         if len(fields) == 6:
@@ -167,8 +160,8 @@ def parse_date_from_text(text):
             # YYYY detected - mark as the last day of the year
             return datetime(fields[0] + 1, 1, 1, tzinfo=timezone.utc) - timedelta(days=1)
 
-    # try to detect any date (watch out for false positives)
-    match = re.search(r"\b(?:19|20)\d{2}[\d./-]*\b", text)
+    # Try to detect any date (watch out for false positives)
+    match = re.search(r"(?:\b|_)(?:19|20)\d{2}[\d\s.:/_-]*\b", text)
     if match:
         try:
             date = dateutil.parser.parse(match[0], fuzzy=False, default=datetime(1970,1,1, tzinfo=timezone.utc))
@@ -183,7 +176,6 @@ def parse_date_from_text(text):
     #         return date
     # except dateutil.parser.ParserError:
     #     pass
-
 
     return None
 
@@ -234,6 +226,8 @@ def set_filesystem_times(filename, atime=None, mtime=None, creation_time=None):
 
 
 def get_dates_from_xattr(filename):
+    # https://www.freedesktop.org/wiki/CommonExtendedAttributes/
+    # user.dublincore.date is the most common
     dates = {}
     if shutil.which('xattr'):
         xattr_names = subprocess.run(['xattr', str(filename)], capture_output=True).stdout.decode().strip().split("\n")
