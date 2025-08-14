@@ -244,7 +244,7 @@ def get_dates_from_media(filename):
             creation_time = metadata['format'].get('creation_time')
             if creation_time:
                 dates["Media Format Created"] = dateutil.parser.parse(creation_time)
-        for stream in metadata['streams']:
+        for stream in metadata.get('streams', []):
             if stream.get('tags'):
                 creation_time = stream['tags'].get('creation_time')
                 if creation_time:
