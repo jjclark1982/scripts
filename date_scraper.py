@@ -52,7 +52,7 @@ class FileDateInfo:
         dates = {}
         dates.update(get_dates_from_filename(self.path))
         dates.update(get_dates_from_filesystem(self.path))
-        dates.update(get_dates_from_multimedia(self.path))
+        dates.update(get_dates_from_media(self.path))
         dates.update(get_dates_from_exif(self.path))
         return dates
 
@@ -138,7 +138,7 @@ def parse_date_from_uuid(s):
     if match:
         id = uuid.UUID(match[0])
         if id.version == 1:
-            date = datetime.fromtimestamp((id.time - 0x01b21dd213814000)*100/1e9).astimezone(timezone.utc)
+            date = datetime.fromtimestamp((id.time - 0x01b21dd213814000) * 100 / 1e9).astimezone(timezone.utc)
             return date
 
     return None
@@ -228,7 +228,7 @@ def set_filesystem_times(filename, atime=None, mtime=None, creation_time=None):
             subprocess.run(['SetFile', '-d', date_str, filename])
 
 
-def get_dates_from_multimedia(filename):
+def get_dates_from_media(filename):
     dates = {}
     if shutil.which('ffprobe'):
         ffprobe_result = subprocess.run([
@@ -334,7 +334,7 @@ class DateScraper:
                     file_info.set_mtime_to_earliest()
                     print(f"Changed modification time of {shlex.quote(str(file_info.path))} from '{prev_mtime}' to '{file_info.earliest_date}'")
                     n_written += 1
-    
+
             if verbose:
                 print()
 
@@ -364,7 +364,11 @@ def test_get_date_from_text():
     assert get_date_from_text("abc (2025-02) xyz    ") == datetime(2025, 2, 28, tzinfo=timezone.utc)
     assert get_date_from_text("abc (2025) xyz       ") == datetime(2025, 12, 31, tzinfo=timezone.utc)
     assert get_date_from_text("abc.2025.04.05.xyz   ") == datetime(2025, 4, 5, tzinfo=timezone.utc)
+    assert get_date_from_text("abc/2025/04/06/01.xyz") == datetime(2025, 4, 6, tzinfo=timezone.utc)
     assert get_date_from_text("abc 1753386545083 xyz") == datetime(2025, 7, 24, 19, 49, 5, 83000, tzinfo=timezone.utc)
     assert get_date_from_text("abc 1753386545 xyz   ") == datetime(2025, 7, 24, 19, 49, 5, tzinfo=timezone.utc)
     assert get_date_from_text("abc ae4e6160-68c2-11f0-b558-1800200c9a66 xyz") == datetime(2025, 7, 24, 19, 16, 20, 580183, tzinfo=timezone.utc)
     assert get_date_from_text("Photo May 19 2023, 11 59 04 PM.jpg") == datetime(2023, 5, 19, 23, 59, 4, tzinfo=timezone.utc)
+    "Screenshot 20200427 220511.jpg"
+    "RDT 20221123 2347021999855542208290714.webp"
+    "1308903232501100548 1.jpg"  # looks like a nanosecond timestamp but may be just a coincidence
