@@ -146,10 +146,13 @@ def parse_date_from_uuid(s):
 
 def parse_date_from_text(text):
     # detect full year in parentheses
-    match = re.search(r"\((\d{4}[\d./-]*)\)", text)
+    match = re.search(r"(?:\(|^)((?:19|20)\d{2}(?:[\s.:/-]\d{1,2}){0,5})(?:\)|$|\.)", text)
     if match:
-        fields = [*map(int, re.split(r"[./-]", match[1]))]
-        if len(fields) == 3:
+        fields = [*map(int, re.split(r"\D", match[1]))]
+        if len(fields) == 6:
+            # YYYY-MM-DD HH:MM:SS detected
+            return datetime(*fields, tzinfo=timezone.utc)
+        elif len(fields) == 3:
             # YYYY-MM-DD detected
             return datetime(*fields, tzinfo=timezone.utc)
         elif len(fields) == 2:
