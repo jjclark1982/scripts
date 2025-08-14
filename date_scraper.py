@@ -266,7 +266,7 @@ def get_dates_from_exif(filename):
 
     d = exif.get(ExifTags.Base.DateTime)
     if d:
-        dates["Exif DateTime"] = dateutil.parser.parse(d).astimezone(timezone.utc)
+        dates["Exif DateTime"] = parse_date_from_text(d)
 
     ifd_tags = [
         ExifTags.Base.DateTimeOriginal,
@@ -277,15 +277,16 @@ def get_dates_from_exif(filename):
     for tag in ifd_tags:
         d = exif_ifd.get(tag)
         if d:
-            dates[f"Exif {tag.name}"] = dateutil.parser.parse(d).astimezone(timezone.utc)
+            dates[f"Exif {tag.name}"] = parse_date_from_text(d)
 
     gps_ifd = exif.get_ifd(ExifTags.IFD.GPSInfo)
     d = gps_ifd.get(ExifTags.GPS.GPSDateStamp)
     t = gps_ifd.get(ExifTags.GPS.GPSTimeStamp)
     if d:
-        dates["Exif GPSDateStamp"] = dateutil.parser.parse(' '.join([d or '', t or ''])).astimezone(timezone.utc)
+        dates["Exif GPSDateStamp"] = parse_date_from_text(' '.join([d or '', t or '']))
 
     return dates
+
 
 class DateScraper:
     """
