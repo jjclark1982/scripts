@@ -41,12 +41,14 @@ function filter_images() {
     while read -r filename; do
         [ -f "$filename" ] || continue # must be a regular file
     	case "$(file -b --mime-type "$filename")" in
-    		"image/vnd.adobe.photoshop" )
-				# filter out .psd files which are "image" type but not supported in most viewers
+    		"image/vnd."* )
+				# Filter out vendor-specific formats that are not supported in most viewers
+				# such as "image/vnd.adobe.photoshop"
 				continue
 				;;
     		"image/"* )
-				# select all other "image" types
+				# Select all other "image" types
+				# https://www.iana.org/assignments/media-types/media-types.xhtml#image
 				echo "$filename"
 				;;
 		esac
