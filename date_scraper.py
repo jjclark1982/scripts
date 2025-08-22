@@ -227,7 +227,7 @@ def set_filesystem_times(filename, atime=None, mtime=None, creation_time=None):
 
 def get_dates_from_xattr(filename):
     # https://www.freedesktop.org/wiki/CommonExtendedAttributes/
-    # user.dublincore.date is the most common
+    # Dublin Core Date (user.dublincore.date) is the most common
     dates = {}
     if shutil.which('xattr'):
         xattr_names = subprocess.run(['xattr', str(filename)], capture_output=True).stdout.decode().strip().split("\n")
@@ -238,7 +238,10 @@ def get_dates_from_xattr(filename):
                 try:
                     date = parse_date_from_text(xattr_value.decode())
                     if date is not None:
-                        dates[f"Xattr {xattr_name}"] = date
+                        if xattr_name == "user.dublincore.date":
+                            dates[f"DCMI Date"] = date
+                        else:
+                            dates[f"Xattr {xattr_name}"] = date
                 except UnicodeDecodeError:
                     # unknown binary data format in xattr value
                     pass
