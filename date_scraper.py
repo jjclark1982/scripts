@@ -34,6 +34,9 @@ except ModuleNotFoundError:
     pass
 
 
+DEFAULT_TZ = timezone.utc
+
+
 @dataclass
 class FileDateInfo:
     """
@@ -85,7 +88,7 @@ class FileDateInfo:
 def is_date_plausible(date):
     if date is None:
         return False
-    too_old = datetime(1971, 1, 2, tzinfo=timezone.utc)
+    too_old = datetime(1972, 1, 1, tzinfo=timezone.utc)
     too_new = datetime.now().astimezone() + timedelta(days=365*5)
     return (too_old < date < too_new)
 
@@ -142,36 +145,37 @@ def parse_date_from_uuid(s):
     return None
 
 
-def parse_date_from_text(text):
+def parse_date_from_text(text, tzinfo=DEFAULT_TZ):
     # Detect date with full year, in parentheses or other delimiters
     match = re.search(r"(?:\(|^|[.:/_-]|\b)((?:19|20)\d{2}(?:[\s.:/_-]\d{1,2}){0,5})(?:\)|$|\b|[.:/_-])", text)
     if match:
         fields = [*map(int, re.split(r"\D", match[1]))]
         if len(fields) == 6:
             # YYYY-MM-DD HH:MM:SS detected
-            return datetime(*fields, tzinfo=timezone.utc)
+            return datetime(*fields, tzinfo=tzinfo)
         elif len(fields) == 3:
             # YYYY-MM-DD detected
-            return datetime(*fields, tzinfo=timezone.utc)
+            return datetime(*fields, tzinfo=tzinfo)
         elif len(fields) == 2:
             # YYYY-MM detected - mark as the last day of the month
-            return datetime(fields[0], fields[1] + 1, 1, tzinfo=timezone.utc) - timedelta(days=1)
+            return datetime(fields[0], fields[1] + 1, 1, tzinfo=tzinfo) - timedelta(days=1)
         elif len(fields) == 1:
             # YYYY detected - mark as the last day of the year
-            return datetime(fields[0] + 1, 1, 1, tzinfo=timezone.utc) - timedelta(days=1)
+            return datetime(fields[0] + 1, 1, 1, tzinfo=tzinfo) - timedelta(days=1)
 
     # Try to detect any date (watch out for false positives)
     match = re.search(r"(?:\b|_)(?:19|20)\d{2}[\d\s.:/_-]*\b", text)
     if match:
         try:
-            date = dateutil.parser.parse(match[0], fuzzy=False, default=datetime(1970,1,1, tzinfo=timezone.utc))
+            date = dateutil.parser.parse(match[0], fuzzy=False, default=datetime(1970,1,1, tzinfo=tzinfo))
             if is_date_plausible(date):
                 return date
-        except dateutil.parser.ParserError:
+        except (dateutil.parser.ParserError, OverflowError):
+            # OverflowError was seen in '20230615232059555' which should be parseable as text
             pass
 
     # try:
-    #     date = dateutil.parser.parse(text, fuzzy=True, default=datetime(1970,1,1, tzinfo=timezone.utc))
+    #     date = dateutil.parser.parse(text, fuzzy=True, default=datetime(1970,1,1, tzinfo=tzinfo))
     #     if is_date_plausible(date):
     #         return date
     # except dateutil.parser.ParserError:
