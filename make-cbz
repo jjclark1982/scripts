@@ -4,22 +4,27 @@
 # Create a .CBZ file of all the images in a directory.
 # Leave non-image files in place.
 #
+# This is a more robust version of the following simple command to zip only images:
+#     zip -0 --latest-time -m -r "$ZIPFILE" "$DIR" \
+#     -i '*.jpeg' -i '*.jpg' -i '*.gif' -i '*.png' -i '*.svg' -i '*.webp' -i '*.heic' -i '*.avif' \
+#     -i '*.JPEG' -i '*.JPG' -i '*.GIF' -i '*.PNG' -i '*.SVG' -i '*.WEBP' -i '*.HEIC' -i '*.AVIF'
+#
 # Example:
-# > make-cbz images/
-# ...
-# Created images.cbz
+#     > make-cbz images/
+#     ...
+#     Created images.cbz
 #
 # Example: zip all subdirectories individually
-# > make-cbz */
-# ...
-# Created a.cbz
-# Created b.cbz
-# Created c.cbz
+#     > make-cbz */
+#     ...
+#     Created a.cbz
+#     Created b.cbz
+#     Created c.cbz
 #
 # Example: use a different extension (default .cbz)
-# > EXTENSION=zip make-cbz images/
-# ...
-# Created images.zip
+#     > EXTENSION=zip make-cbz images/
+#     ...
+#     Created images.zip
 
 
 EXTENSION=".${EXTENSION:-cbz}"
@@ -74,16 +79,6 @@ function zip_images_in_dir() { (
 		return 3
 	fi
 	echo Creating "$ZIPFILE"...
-
-	# Simple command to zip only common image extensions
-	# zip -0 --latest-time -m -r "$ZIPFILE" "$DIR" \
-	# 	-i '*.jpeg' -i '*.jpg' -i '*.gif' -i '*.png' -i '*.svg' -i '*.webp' -i '*.heic' -i '*.avif' \
-	# 	-i '*.JPEG' -i '*.JPG' -i '*.GIF' -i '*.PNG' -i '*.SVG' -i '*.WEBP' -i '*.HEIC' -i '*.AVIF'
-
-	# if [ -z "$(list_images .)" ]; then
-	# 	echo No image files found in "$DIR". Skipped.
-	# 	return 4
-	# fi
 
 	# Zip identified images with no compression, and remove original files
 	list_images "$DIR" | zip -0 --latest-time -m "$ZIPFILE" -@
