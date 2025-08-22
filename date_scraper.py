@@ -348,7 +348,8 @@ class DateScraper:
             description=cls.__doc__
         )
         parser.add_argument('paths', nargs='+', type=Path, help='paths to process')
-        parser.add_argument('--rewrite-mtime', action='store_true', help='paths to process')
+        parser.add_argument('--rewrite-mtime', action='store_true', help='rewrite modification time to earliest detected date')
+        parser.add_argument('--rename-in-date-order', action='store_true', help='rename files in order of detected date')
         parser.add_argument('--verbose', action='store_true', default=True)
         parser.add_argument('--quiet', dest='verbose', action='store_false')
         args = parser.parse_args()
@@ -361,12 +362,15 @@ class DateScraper:
         self.files = map(FileDateInfo, all_paths)
         self.n_files = len(all_paths)
 
-    def run(self, verbose=False, rewrite_mtime=False, **kwargs):
+    def run(self, verbose=False, rewrite_mtime=False, rename_in_date_order=False, **kwargs):
         if verbose and self.n_files > 1:
             print(f"{self.__class__.__name__}: Reading {self.n_files} files...\n")
 
+        loaded_files = []
+
         n_written = 0
         for file_info in self.files:
+            loaded_files.append(file_info)
             if verbose:
                 if sys.stdout.isatty():
                     print(file_info.pretty_str())
@@ -382,9 +386,24 @@ class DateScraper:
 
             if verbose:
                 print()
+        self.files = loaded_files
 
         if verbose and n_written > 0:
             print(f"{self.__class__.__name__}: Updated {n_written} / {self.n_files} files.")
+
+        if rename_in_date_order:
+            self.files = [*self.files]
+            files_in_order = sorted(self.files, key=lambda f: f.earliest_date)
+            num_digits = len(str(self.n_files))
+            i = 0
+            for file_info in files_in_order:
+                i += 1
+                prefix = str(i).zfill(num_digits)
+                if not file_info.path.name.startswith(prefix):
+                    new_name = file_info.path.with_name(f"{prefix}-{file_info.path.name}")
+                if verbose:
+                    print(f"{file_info.path.name} -> {new_name.name}")
+                file_info.path.rename(new_name)
 
 
 def expand_paths(paths):
