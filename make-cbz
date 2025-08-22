@@ -35,10 +35,13 @@ function filter_images() {
     local filename
     while read -r filename; do
         [ -f "$filename" ] || continue # must be a regular file
-    	case "$(file "$filename")" in
-    		*"image"* |\
-			*"Image"* |\
-			*"Picture"* )
+    	case "$(file -b --mime-type "$filename")" in
+    		"image/vnd.adobe.photoshop" )
+				# filter out .psd files which are "image" type but not supported in most viewers
+				continue
+				;;
+    		"image/"* )
+				# select all other "image" types
 				echo "$filename"
 				;;
 		esac
