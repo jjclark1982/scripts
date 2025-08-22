@@ -130,12 +130,12 @@ def parse_date_from_timestamp(s):
 
 
 def parse_date_from_uuid(s):
-    # Detect timestamp in UUID v1
+    # Detect timestamp in UUID
     uuid_re = r"(?i:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})"
     match = re.search(uuid_re, s)
     if match:
         id = uuid.UUID(match[0])
-        if id.version == 1:
+        if id.version in [1, 2, 6, 7]:
             date = datetime.fromtimestamp((id.time - 0x01b21dd213814000) * 100 / 1e9).astimezone(timezone.utc)
             return date
 
