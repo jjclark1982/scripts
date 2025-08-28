@@ -6,6 +6,7 @@
 # - set mtime based on metadata or filename
 # - add date to filename
 # - add index to filename based on date order
+# - set folder mtime to contained file date
 
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
@@ -158,6 +159,8 @@ def parse_date_from_text(text, tzinfo=DEFAULT_TZ):
             return datetime(*fields, tzinfo=tzinfo)
         elif len(fields) == 2:
             # YYYY-MM detected - mark as the last day of the month
+            if fields[1] == 12:
+                return datetime(fields[0] + 1, 1, 1, tzinfo=tzinfo) - timedelta(days=1)
             return datetime(fields[0], fields[1] + 1, 1, tzinfo=tzinfo) - timedelta(days=1)
         elif len(fields) == 1:
             # YYYY detected - mark as the last day of the year
@@ -410,7 +413,7 @@ def expand_paths(paths):
     results = set()
     for path in paths:
         if path.is_dir():
-            results.update(map(Path, glob.iglob(str(path / "**/*"), recursive=True)))
+            results.update(map(Path, glob.iglob(glob.escape(str(path)) + "/**/*", recursive=True)))
         elif path.exists():
             results.add(path)
         else:
