@@ -40,6 +40,12 @@ function filter_images() {
     local filename
     while read -r filename; do
         [ -f "$filename" ] || continue # must be a regular file
+        # case "$filename" in
+        # 	*.jpeg | *.jpg | *.gif | *.png | *.svg | *.webp | *.heic | *.avif | \
+        # 	*.JPEG | *.JPG | *.GIF | *.PNG | *.SVG | *.WEBP | *.HEIC | *.AVIF )
+		# 		echo "$filename"
+		# 		;;
+		# esac
     	case "$(file -b --mime-type "$filename")" in
     		"image/vnd."* )
 				# Filter out vendor-specific formats that are not supported in most viewers
@@ -64,8 +70,15 @@ function zip_images_in_dir() { (
 		echo Error: "$DIR" is not a directory. Skipped.
 		return 1
 	fi
+	if [ "$(basename "$DIR")" = "@eaDir" ]; then
+		echo "$DIR" is not a normal directory. Skipped.
+		return 0
+	fi
 
 	# Work relative to parent folder of DIR, to standardize paths within zip files.
+	# TODO: seeing some errors on NFS
+	# shell-init: error retrieving current directory: getcwd: cannot access parent directories: No such file or directory
+	# chdir: error retrieving current directory: getcwd: cannot access parent directories: No such file or directory
 	cd "$DIR"
 	DIR="$(basename "$PWD")"
 	cd ..
@@ -93,8 +106,8 @@ function zip_images_in_dir() { (
 
 	# Remove empty folders.
 	# (zip -m is supposed to handle this but find is more thorough)
-	# TODO: check how this handles @eaDir
-	find "$DIR" -name ".DS_Store" -delete
+	find "$DIR" -name '.DS_Store' -o -name 'thumbs.db' -delete
+	find "$DIR" -name "*@SynoEAStream" -o -name "*@SynoResource" -delete
 	find "$DIR" -type d -empty -delete
 
 	# If main directory was not empty, move zipfile into it to stay with related files.
