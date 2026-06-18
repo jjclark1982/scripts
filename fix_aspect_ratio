@@ -1,0 +1,25 @@
+#!/bin/sh -eu
+
+ASPECT="$1"
+shift
+
+for FILE; do
+
+	if [ -f "$FILE" ]; then
+		echo Setting aspect ratio of \'$FILE\' to $ASPECT;
+	else
+		echo "$FILE does not exist"
+		exit 1
+	fi
+	OUTFILE="${FILE%.*} [${ASPECT//:/x}].${FILE##*.}"
+
+	# first copy file attributes and xattrs
+	cp "$FILE" "$OUTFILE"
+	# then overwrite the copy with the modified data
+	ffmpeg -i "$FILE" -aspect "$ASPECT" -c copy "$OUTFILE" -y
+
+	# [ -f "$FILE" ] || exit 2
+	# rm "$FILE".tmp
+	echo
+
+done
